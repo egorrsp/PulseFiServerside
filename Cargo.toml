@@ -5,8 +5,13 @@ edition = "2024"
 
 [dependencies]
 actix-web = "4"
+actix-cors = "0.7.1"
 ed25519-dalek = "2.2.0"
-serde = "1.0.228"
 bs58 = "0.5.1"
 rand = "0.8"
 base64 = "0.22.1"
+jsonwebtoken = "9"
+serde = { version = "1.0.228", features = ["derive"] }
+chrono = "0.4"
+serde_json = "1.0.145"
+actix-web-lab = "0.24.3"
