@@ -1,0 +1,12 @@
+[package]
+name = "PulseFiServerside"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4"
+ed25519-dalek = "2.2.0"
+serde = "1.0.228"
+bs58 = "0.5.1"
+rand = "0.8"
+base64 = "0.22.1"
