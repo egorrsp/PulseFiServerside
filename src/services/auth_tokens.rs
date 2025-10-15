@@ -21,7 +21,7 @@ pub fn generate_tokens(pubkey: &str) -> (String, String) {
     (access, refresh)
 }
 
-fn verify_token(token: &str) -> bool {
+pub fn verify_token(token: &str) -> bool {
     let secret = b"secret-q1w2e3r4t5y6u7i8-key";
     decode::<Claims>(
         token,
