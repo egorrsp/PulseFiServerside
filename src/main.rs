@@ -4,31 +4,30 @@ mod api;
 mod middleware;
 
 use actix_web::{ get, post, cookie::{Cookie, time::Duration as CookieDuration, SameSite}, web, App, Error, HttpResponse, HttpServer, Responder };
-use awc::Client;
 use actix_web::middleware::from_fn;
 use actix_cors::Cors;
 use models::request_data::AuthPayload;
 use serde_json::{self, json};
 use middleware::jwt_middleware_with_refresh;
 
-use crate::api::{ authentification_hendler, send_nonce_hendler, ws_proxy };
+use crate::api::{ authentification_hendler, send_nonce_hendler };
 
-#[post("/authentification")]
-pub async fn authentification(payload: web::Json<AuthPayload>) -> Result<HttpResponse, Error> {
+#[post("/authentication")]
+pub async fn authentication(payload: web::Json<AuthPayload>) -> Result<HttpResponse, Error> {
     match authentification_hendler(&payload) {
         Ok((access_token, refresh_token)) => {
             let access_cookie = Cookie::build("access_token", access_token)
                 .http_only(true)
-                .secure(false)
-                .same_site(SameSite::Lax)
+                .secure(true)
+                .same_site(SameSite::None)
                 .max_age(CookieDuration::hours(1))
                 .path("/")
                 .finish();
 
             let refresh_cookie = Cookie::build("refresh_token", refresh_token)
                 .http_only(true)
-                .secure(false)
-                .same_site(SameSite::Lax)
+                .secure(true)
+                .same_site(SameSite::None)
                 .max_age(CookieDuration::days(7))
                 .path("/")
                 .finish();
@@ -52,25 +51,9 @@ async fn send_nonce() -> impl Responder {
 
 #[get("/check")]
 async fn check_protection() -> impl Responder {
-    HttpResponse::Ok().body("Good")
-}
-
-#[post("/rpc")]
-async fn proxy_rpc(body: web::Bytes) -> actix_web::Result<HttpResponse> {
-    let client = Client::new();
-
-    let mut res = client
-        .post("http://127.0.0.1:8899")
-        .insert_header(("Content-Type", "application/json"))
-        .send_body(body).await
-        .map_err(|err| {
-            eprintln!("RPC proxy error: {:?}", err);
-            actix_web::error::ErrorBadGateway("RPC proxy failed")
-        })?;
-
-    let bytes = res.body().await.map_err(|_| actix_web::error::ErrorBadGateway("RPC body failed"))?;
-
-    Ok(HttpResponse::Ok().content_type("application/json").body(bytes))
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "protected"
+    }))
 }
 
 #[actix_web::main]
@@ -84,14 +67,12 @@ async fn main() -> std::io::Result<()> {
                     .allowed_headers(vec!["Content-Type", "Authorization", "solana-client"])
                     .supports_credentials()
             )
-            .service(authentification)
+            .service(authentication)
             .service(send_nonce)
             .service(
                 web::scope("/protect")
                     .wrap(from_fn(jwt_middleware_with_refresh))
                     .service(check_protection)
-                    .service(proxy_rpc)
-                    .route("/ws", web::get().to(ws_proxy))
             )
     })
     .bind(("127.0.0.1", 8080))?
