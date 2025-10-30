@@ -4,7 +4,7 @@ use rand::RngCore;
 use base64::{engine::general_purpose, Engine as _};
 use std::error::Error;
 
-pub fn check_signe(
+pub fn check_signer(
     nonce: &str,
     public_key_bytes: &[u8; 32],
     signature_bytes: &[u8; 64],

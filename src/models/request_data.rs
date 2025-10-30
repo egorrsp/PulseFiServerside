@@ -12,3 +12,8 @@ pub struct Claims {
     pub sub: String,
     pub exp: usize,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ForNonce {
+    pub pubkey: String,
+}

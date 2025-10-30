@@ -21,11 +21,10 @@ pub fn generate_tokens(pubkey: &str) -> (String, String) {
     (access, refresh)
 }
 
-pub fn verify_token(token: &str) -> bool {
-    let secret = b"secret-q1w2e3r4t5y6u7i8-key";
+pub fn verify_token(token: &str, secret: &str) -> bool {
     decode::<Claims>(
         token,
-        &DecodingKey::from_secret(secret),
+        &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::default(),
     )
     .is_ok()

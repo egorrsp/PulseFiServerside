@@ -1,20 +1,24 @@
 use actix_web::web;
 use bs58;
 use crate::{
-    models::request_data::AuthPayload,
-    services::{ check_signe, generate_nonce, generate_tokens },
+    models::{request_data::AuthPayload},
+    services::{ check_signer, generate_nonce, generate_tokens },
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use chrono::{Utc, Duration};
 use crate::models::request_data::Claims;
+use crate::db_hooks;
+use crate::models::config;
 
 pub fn send_nonce_hendler() -> String {
     let nonce = generate_nonce();
+    // Middleware to put nonce into response
     nonce
 }
 
 pub fn authentification_hendler(
-    payload: &web::Json<AuthPayload>
+    payload: &web::Json<AuthPayload>,
+    cfg: web::Data<config::Config>
 ) -> Result<(String, String), Box<dyn std::error::Error>> {
     let public_key_vec = bs58::decode(&payload.public_key).into_vec()?;
     let public_key_bytes: [u8; 32] = public_key_vec
@@ -26,7 +30,13 @@ pub fn authentification_hendler(
         .try_into()
         .map_err(|_| "Invalid signature length")?;
 
-    let valid = check_signe(&payload.nonce, &public_key_bytes, &signature_bytes)?;
+    match db_hooks::check_nonce_in_cache(&payload.nonce, &payload.public_key, &cfg.redis_url) {
+        Ok(true) => (),
+        Err(_) | Ok(false) => return Err("Nonce not found or does not match".into()),
+    }
+    let valid = check_signer(&payload.nonce, &public_key_bytes, &signature_bytes)?;
+    
+    db_hooks::reverse_flag(&payload.nonce, &cfg.redis_url)?;
 
     if valid {
         Ok(generate_tokens(&payload.public_key))
@@ -35,13 +45,11 @@ pub fn authentification_hendler(
     }
 }
 
-const SECRET: &[u8] = b"secret-q1w2e3r4t5y6u7i8-key";
-
-pub fn refresh_tokens(refresh_token: &str) -> Option<(String, String)> {
+pub fn refresh_tokens(refresh_token: &str, jwt_secret: &str) -> Option<(String, String)> {
     
     let decoded = decode::<Claims>(
         refresh_token,
-        &DecodingKey::from_secret(SECRET),
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
         &Validation::default(),
     ).ok()?;
 
@@ -65,13 +73,13 @@ pub fn refresh_tokens(refresh_token: &str) -> Option<(String, String)> {
     let access = encode(
         &Header::default(),
         &access_claims,
-        &EncodingKey::from_secret(SECRET),
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
     ).ok()?;
 
     let refresh = encode(
         &Header::default(),
         &refresh_claims,
-        &EncodingKey::from_secret(SECRET),
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
     ).ok()?;
 
     Some((access, refresh))
