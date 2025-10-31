@@ -9,60 +9,29 @@ use dotenv::dotenv;
 use std::{ env };
 
 use actix_web::{
-    get,
     post,
-    cookie::{ Cookie, time::Duration as CookieDuration, SameSite },
+    get,
     web,
     App,
-    Error,
     HttpResponse,
     HttpServer,
     Responder,
 };
 use actix_cors::Cors;
-use models::{ request_data::{ AuthPayload, ForNonce }, config };
-use serde_json::{ self, json };
+use models::{ request_data::{ ForNonce }, config };
+use serde_json::{ self };
 use db_hooks::put_nonce_into_cache;
 
-use crate::{api::{ authentification_hendler, send_nonce_hendler }, middleware::jwt_middleware::JwtMiddlewareFactory};
+use crate::{
+    api::{ authentication, logout, send_nonce_hendler },
+    middleware::jwt_middleware::JwtMiddlewareFactory,
+};
 
-#[post("/authentication")]
-pub async fn authentication(
-    payload: web::Json<AuthPayload>,
+#[post("/nonce")]
+async fn send_nonce(
+    payload: web::Json<ForNonce>,
     cfg: web::Data<config::Config>
-) -> Result<HttpResponse, Error> {
-    match authentification_hendler(&payload, cfg) {
-        Ok((access_token, refresh_token)) => {
-            let access_cookie = Cookie::build("access_token", access_token)
-                .http_only(true)
-                .secure(true)
-                .same_site(SameSite::None)
-                .max_age(CookieDuration::hours(1))
-                .path("/")
-                .finish();
-
-            let refresh_cookie = Cookie::build("refresh_token", refresh_token)
-                .http_only(true)
-                .secure(true)
-                .same_site(SameSite::None)
-                .max_age(CookieDuration::days(7))
-                .path("/")
-                .finish();
-
-            Ok(
-                HttpResponse::Ok()
-                    .cookie(access_cookie)
-                    .cookie(refresh_cookie)
-                    .json(json!({ "status": "ok" }))
-            )
-        }
-
-        Err(e) => Ok(HttpResponse::Unauthorized().body(format!("Error: {}", e))),
-    }
-}
-
-#[get("/nonce")]
-async fn send_nonce(payload: web::Json<ForNonce>, cfg: web::Data<config::Config>) -> impl Responder {
+) -> impl Responder {
     let nonce = send_nonce_hendler();
 
     if let Err(e) = put_nonce_into_cache(&nonce, &payload.pubkey, &cfg.redis_url) {
@@ -74,7 +43,7 @@ async fn send_nonce(payload: web::Json<ForNonce>, cfg: web::Data<config::Config>
     }
 
     HttpResponse::Ok().json(serde_json::json!({
-        "nonce": send_nonce_hendler()
+        "nonce": nonce
     }))
 }
 
@@ -113,6 +82,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(authentication)
             .service(send_nonce)
+            .service(logout)
             .service(
                 web
                     ::scope("/protect")

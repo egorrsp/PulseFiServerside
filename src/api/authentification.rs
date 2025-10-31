@@ -10,12 +10,17 @@ use crate::models::request_data::Claims;
 use crate::db_hooks;
 use crate::models::config;
 
+use actix_web::{ post, get, HttpResponse, Error, Responder };
+use actix_web::cookie::{ Cookie, time::Duration as CookieDuration, SameSite };
+use serde_json::json;
+
 pub fn send_nonce_hendler() -> String {
     let nonce = generate_nonce();
     // Middleware to put nonce into response
     nonce
 }
 
+// Helper for fn up down below
 pub fn authentification_hendler(
     payload: &web::Json<AuthPayload>,
     cfg: web::Data<config::Config>
@@ -42,6 +47,41 @@ pub fn authentification_hendler(
         Ok(generate_tokens(&payload.public_key))
     } else {
         Err("Invalid signature".into())
+    }
+}
+
+#[post("/authentication")]
+pub async fn authentication(
+    payload: web::Json<AuthPayload>,
+    cfg: web::Data<config::Config>
+) -> Result<HttpResponse, Error> {
+    match authentification_hendler(&payload, cfg) {
+        Ok((access_token, refresh_token)) => {
+            let access_cookie = Cookie::build("access_token", access_token)
+                .http_only(true)
+                .secure(true)
+                .same_site(SameSite::None)
+                .max_age(CookieDuration::hours(1))
+                .path("/")
+                .finish();
+
+            let refresh_cookie = Cookie::build("refresh_token", refresh_token)
+                .http_only(true)
+                .secure(true)
+                .same_site(SameSite::None)
+                .max_age(CookieDuration::days(7))
+                .path("/")
+                .finish();
+
+            Ok(
+                HttpResponse::Ok()
+                    .cookie(access_cookie)
+                    .cookie(refresh_cookie)
+                    .json(json!({ "status": "ok" }))
+            )
+        }
+
+        Err(e) => Ok(HttpResponse::Unauthorized().body(format!("Error: {}", e))),
     }
 }
 
@@ -83,4 +123,30 @@ pub fn refresh_tokens(refresh_token: &str, jwt_secret: &str) -> Option<(String, 
     ).ok()?;
 
     Some((access, refresh))
+}
+
+#[get("/logout")]
+async fn logout() -> impl Responder {
+    let access_cookie = Cookie::build("access_token", "")
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::None)
+        .max_age(CookieDuration::seconds(0))
+        .path("/")
+        .finish();
+
+    let refresh_cookie = Cookie::build("refresh_token", "")
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::None)
+        .max_age(CookieDuration::seconds(0))
+        .path("/")
+        .finish();
+
+    HttpResponse::Ok()
+        .cookie(access_cookie)
+        .cookie(refresh_cookie)
+        .json(serde_json::json!({
+            "status": "logged out"
+        }))
 }
