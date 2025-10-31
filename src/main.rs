@@ -3,6 +3,7 @@ mod models;
 mod api;
 mod middleware;
 mod db_hooks;
+mod errors;
 
 use dotenv::dotenv;
 use std::{ env };
@@ -64,10 +65,10 @@ pub async fn authentication(
 async fn send_nonce(payload: web::Json<ForNonce>, cfg: web::Data<config::Config>) -> impl Responder {
     let nonce = send_nonce_hendler();
 
-    if let Err(_) = put_nonce_into_cache(&nonce, &payload.pubkey, &cfg.redis_url) {
+    if let Err(e) = put_nonce_into_cache(&nonce, &payload.pubkey, &cfg.redis_url) {
         return HttpResponse::InternalServerError().json(
             serde_json::json!({
-            "error": "Failed to store nonce"
+            "error": "Failed to store nonce: ".to_string() + &e.to_string()
         })
         );
     }
