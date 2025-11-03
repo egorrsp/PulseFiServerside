@@ -1,4 +1,5 @@
 pub mod authentification;
-pub mod proxy;
+pub mod user;
 
 pub use authentification::*;
+pub use user::*;

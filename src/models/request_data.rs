@@ -17,3 +17,9 @@ pub struct Claims {
 pub struct ForNonce {
     pub pubkey: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RegisterUserRequest {
+    pub public_key: String,
+    pub username: String,
+}

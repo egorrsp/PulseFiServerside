@@ -1,24 +1,38 @@
 use actix_web::web;
 use bs58;
 use crate::{
-    models::{request_data::AuthPayload},
-    services::{ check_signer, generate_nonce, generate_tokens },
+    repositories::put_nonce_into_cache, 
+    models::request_data::{AuthPayload, ForNonce}, 
+    services::{ check_signer, generate_nonce, generate_tokens }
 };
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use chrono::{Utc, Duration};
-use crate::models::request_data::Claims;
-use crate::db_hooks;
+use crate::repositories;
 use crate::models::config;
-
 use actix_web::{ post, get, HttpResponse, Error, Responder };
 use actix_web::cookie::{ Cookie, time::Duration as CookieDuration, SameSite };
 use serde_json::json;
 
-pub fn send_nonce_hendler() -> String {
+
+// Endpoint to request a nonce
+#[post("/nonce")]
+async fn send_nonce(
+    payload: web::Json<ForNonce>,
+    cfg: web::Data<config::Config>
+) -> impl Responder {
     let nonce = generate_nonce();
-    // Middleware to put nonce into response
-    nonce
+
+    if let Err(e) = put_nonce_into_cache(&nonce, &payload.pubkey, &cfg.redis_url) {
+        return HttpResponse::InternalServerError().json(
+            serde_json::json!({
+            "error": "Failed to store nonce: ".to_string() + &e.to_string()
+        })
+        );
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "nonce": nonce
+    }))
 }
+
 
 // Helper for fn up down below
 pub fn authentification_hendler(
@@ -35,21 +49,23 @@ pub fn authentification_hendler(
         .try_into()
         .map_err(|_| "Invalid signature length")?;
 
-    match db_hooks::check_nonce_in_cache(&payload.nonce, &payload.public_key, &cfg.redis_url) {
+    match repositories::check_nonce_in_cache(&payload.nonce, &payload.public_key, &cfg.redis_url) {
         Ok(true) => (),
         Err(_) | Ok(false) => return Err("Nonce not found or does not match".into()),
     }
     let valid = check_signer(&payload.nonce, &public_key_bytes, &signature_bytes)?;
     
-    db_hooks::reverse_flag(&payload.nonce, &cfg.redis_url)?;
+    repositories::reverse_flag(&payload.nonce, &cfg.redis_url)?;
 
     if valid {
-        Ok(generate_tokens(&payload.public_key))
+        Ok(generate_tokens(&payload.public_key, &cfg.jwt_secret))
     } else {
         Err("Invalid signature".into())
     }
 }
 
+
+// Endpoint for authentication
 #[post("/authentication")]
 pub async fn authentication(
     payload: web::Json<AuthPayload>,
@@ -85,46 +101,8 @@ pub async fn authentication(
     }
 }
 
-pub fn refresh_tokens(refresh_token: &str, jwt_secret: &str) -> Option<(String, String)> {
-    
-    let decoded = decode::<Claims>(
-        refresh_token,
-        &DecodingKey::from_secret(jwt_secret.as_bytes()),
-        &Validation::default(),
-    ).ok()?;
 
-    let pubkey = decoded.claims.sub;
-
-    let now = Utc::now().timestamp() as usize;
-    if decoded.claims.exp < now {
-        return None; // токен просрочен
-    }
-
-    let access_claims = Claims {
-        sub: pubkey.clone(),
-        exp: (Utc::now() + Duration::minutes(15)).timestamp() as usize,
-    };
-
-    let refresh_claims = Claims {
-        sub: pubkey.clone(),
-        exp: (Utc::now() + Duration::days(7)).timestamp() as usize,
-    };
-
-    let access = encode(
-        &Header::default(),
-        &access_claims,
-        &EncodingKey::from_secret(jwt_secret.as_bytes()),
-    ).ok()?;
-
-    let refresh = encode(
-        &Header::default(),
-        &refresh_claims,
-        &EncodingKey::from_secret(jwt_secret.as_bytes()),
-    ).ok()?;
-
-    Some((access, refresh))
-}
-
+// Endpoint for logout
 #[get("/logout")]
 async fn logout() -> impl Responder {
     let access_cookie = Cookie::build("access_token", "")
@@ -149,4 +127,13 @@ async fn logout() -> impl Responder {
         .json(serde_json::json!({
             "status": "logged out"
         }))
+}
+
+
+// Protected endpoint example
+#[get("/check")]
+async fn check_protection() -> impl Responder {
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "protected"
+    }))
 }

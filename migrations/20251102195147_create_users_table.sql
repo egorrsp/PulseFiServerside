@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS users;
+
+
+CREATE TABLE users (
+    public_key VARCHAR(64) PRIMARY KEY,
+    username VARCHAR(50),
+    rewards TEXT[],
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lust_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    banned BOOLEAN NOT NULL DEFAULT FALSE,
+    ban_reason TEXT
+);

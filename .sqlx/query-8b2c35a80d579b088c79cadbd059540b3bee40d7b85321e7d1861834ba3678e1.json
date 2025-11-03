@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT public_key, username, rewards, created_at, lust_seen, banned, ban_reason\n        FROM users\n        WHERE public_key = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "public_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "username",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "rewards",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 4,
+        "name": "lust_seen",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 5,
+        "name": "banned",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "ban_reason",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "8b2c35a80d579b088c79cadbd059540b3bee40d7b85321e7d1861834ba3678e1"
+}
