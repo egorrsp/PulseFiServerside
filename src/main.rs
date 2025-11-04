@@ -8,19 +8,13 @@ mod errors;
 use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
 use std::{ env };
-use actix_web::{
-    web,
-    App,
-    HttpServer,
-};
+use actix_web::{ web, App, HttpServer };
 use actix_cors::Cors;
 use models::config;
 use crate::{
     api::{ authentication, check_protection, get_user, logout, register_user, send_nonce },
     middleware::jwt_middleware::JwtMiddlewareFactory,
 };
-
-
 
 // Main function to start the server
 #[actix_web::main]
@@ -42,8 +36,7 @@ async fn main() -> std::io::Result<()> {
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(&postgres_url)
-        .await
+        .connect(&postgres_url).await
         .expect("Error in connecting db");
 
     HttpServer::new(move || {
@@ -62,17 +55,16 @@ async fn main() -> std::io::Result<()> {
             .service(logout)
             .service(
                 web
-                    ::scope("/user")
-                    .service(register_user)
-                    .service(get_user)
-            )
-            .service(
-                web
                     ::scope("/protect")
                     .wrap(JwtMiddlewareFactory {
                         jwt_secret: cfg.jwt_secret.clone(),
                     })
                     .service(check_protection)
+                    .service(
+                        web::scope("/user")
+                            .service(register_user)
+                            .service(get_user)
+                    )
             )
     })
         .bind((bind_host.to_string(), bind_port))?

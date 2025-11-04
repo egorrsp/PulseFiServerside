@@ -19,7 +19,23 @@ pub struct ForNonce {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct RegisterUserRequest {
+pub struct _ChangeNameUserRequest {
     pub public_key: String,
     pub username: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RegisterUserRequest {
+    pub public_key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserResponse {
+    pub public_key: String,
+    pub username: Option<String>,
+    pub rewards: Option<Vec<String>>,
+    pub created_at: String,
+    pub last_seen: String,
+    pub banned: bool,
+    pub ban_reason: Option<String>
 }
