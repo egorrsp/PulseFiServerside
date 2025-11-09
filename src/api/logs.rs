@@ -1,4 +1,4 @@
-use actix_web::{post, web, HttpResponse, Error}
+use actix_web::{post, web, HttpResponse, Error};
 use serde_json::json;
 use sqlx::PgPool;
 
