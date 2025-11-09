@@ -3,9 +3,9 @@ use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
-    models::request_data::RegisterUserRequest, repositories::{
+    models::request_data::{ChangeNameUserRequest, RegisterUserRequest}, repositories::{
         get_user_by_public_key, 
-        set_user
+        set_user, user_bd::change_username_from_bd
     }, services::helpers::serialize_uzer
 };
 
@@ -48,5 +48,19 @@ pub async fn get_user(
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "error": format!("Database error: {}", e)
         }))),
+    }
+}
+
+/// Endpoint to change username
+#[post("/change_username")]
+pub async fn change_username(
+    pool: web::Data<PgPool>,
+    request: web::Json<ChangeNameUserRequest>
+) -> Result<HttpResponse, Error> {
+    let result = change_username_from_bd(pool, request.clone()).await;
+    match result {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!(format!("Name of user {} is updated", request.pubkey)))),
+        Err(sqlx::Error::RowNotFound) => Ok(HttpResponse::NotFound().json(json!({ "error": format!("User {} not found", request.pubkey)}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"error" : format!("Error in server or database - {}", e)}))),
     }
 }

@@ -12,7 +12,7 @@ use actix_web::{ web, App, HttpServer };
 use actix_cors::Cors;
 use models::config;
 use crate::{
-    api::{ authentication, check_protection, get_user, logout, register_user, send_nonce },
+    api::{ authentication, change_username, check_protection, get_user, logout, register_user, send_nonce },
     middleware::jwt_middleware::JwtMiddlewareFactory,
 };
 
@@ -62,11 +62,13 @@ async fn main() -> std::io::Result<()> {
                     .service(check_protection)
                     .service(
                         web::scope("/user")
+                            .service(change_username)
                             .service(register_user)
                             .service(get_user)
                     )
             )
     })
         .bind((bind_host.to_string(), bind_port))?
-        .run().await
+        .run()
+        .await
 }

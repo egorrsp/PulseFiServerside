@@ -18,10 +18,11 @@ pub struct ForNonce {
     pub pubkey: String,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct _ChangeNameUserRequest {
-    pub public_key: String,
-    pub username: String,
+pub struct ChangeNameUserRequest {
+    pub pubkey: String,
+    pub newUsername: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
